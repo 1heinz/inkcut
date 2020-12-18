@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Copyright (c) 2017, Jairus Martin.
+Copyright (c) 2017-2020, The Inkcut Team.
 
 Distributed under the terms of the GPL v3 License.
 
 The full license is in the file LICENSE, distributed with this software.
 
-Parses an SVG document into a QPainterPath. Adapted from inkscape's path 
+Parses an SVG document into a QPainterPath. Adapted from inkscape's path
 parsers written by Aaron Spike.
 
 Created on Jan 5, 2015
@@ -19,19 +19,20 @@ import math
 from math import sqrt, tan, atan, atan2, cos, acos, sin, pi, radians
 from lxml import etree
 from copy import deepcopy
-from enaml.qt import QtGui, QtCore
+from enaml.qt.QtGui import QPainterPath, QTransform, QFont
+from enaml.qt.QtCore import QPointF, QRectF
 
-ElementType = QtGui.QPainterPath.ElementType
+ElementType = QPainterPath.ElementType
 EtreeElement = etree._Element
 
 
-class QtSvgItem(QtGui.QPainterPath):
+class QtSvgItem(QPainterPath):
     tag = None
     _nodes = None
     _uuconv = {'in': 90.0, 'pt': 1.25, 'px': 1, 'mm': 3.5433070866,
                'cm': 35.433070866, 'm': 3543.3070866,
                'km': 3543307.0866, 'pc': 15.0, 'yd': 3240, 'ft': 1080}
-    
+
     def __init__(self, e, nodes=None, **kwargs):
         if not isinstance(e, EtreeElement):
             raise TypeError("%s only works with etree Elements, "
@@ -43,40 +44,40 @@ class QtSvgItem(QtGui.QPainterPath):
 
         self._nodes = nodes
         self._e = e
-        
+
         # Parse from node
         self.parse(e)
-        
+
         # Parse transform
         self *= self.parseTransform(e)
-        
+
     def __imul__(self, m):
-        """ Do in place multiplication by subtracting everything from itself 
-        then adding the multiplied values back. 
+        """ Do in place multiplication by subtracting everything from itself
+        then adding the multiplied values back.
         """
         tmp = self*m
         self -= self
         self += tmp
         return self
-    
+
     @staticmethod
     def toSubpathList(self):
         paths = []
-        path = QtGui.QPainterPath()
+        path = QPainterPath()
         i = 0
         while i < self.elementCount():
             e = self.elementAt(i)
             if e.type == ElementType.MoveToElement:
                 if not path.isEmpty():
                     paths.append(path)
-                path = QtGui.QPainterPath(QtCore.QPointF(e.x, e.y))
+                path = QPainterPath(QPointF(e.x, e.y))
             elif e.type == ElementType.LineToElement:
-                path.lineTo(QtCore.QPointF(e.x, e.y))
+                path.lineTo(QPointF(e.x, e.y))
             elif e.type == ElementType.CurveToElement:
                 e1, e2 = self.elementAt(i+1), self.elementAt(i+2)
-                path.cubicTo(QtCore.QPointF(e.x, e.y),
-                             QtCore.QPointF(e1.x, e1.y),
-                             QtCore.QPointF(e2.x, e2.y))
+                path.cubicTo(QPointF(e.x, e.y),
+                             QPointF(e1.x, e1.y),
+                             QPointF(e2.x, e2.y))
                 i += 2
             else:
                 raise ValueError("Invalid element type %s" % (e.type,))
@@ -84,25 +85,25 @@ class QtSvgItem(QtGui.QPainterPath):
         if not path.isEmpty():
             paths.append(path)
         return paths
-    
+
     @staticmethod
     def splitAtPercent(self, t):
         paths = []
-        path = QtGui.QPainterPath()
+        path = QPainterPath()
         i = 0
         while i < self.elementCount():
             e = self.elementAt(i)
             if e.type == ElementType.MoveToElement:
                 if not path.isEmpty():
                     paths.append(path)
-                path = QtGui.QPainterPath(QtCore.QPointF(e.x, e.y))
+                path = QPainterPath(QPointF(e.x, e.y))
             elif e.type == ElementType.LineToElement:
-                path.lineTo(QtCore.QPointF(e.x, e.y))
+                path.lineTo(QPointF(e.x, e.y))
             elif e.type == ElementType.CurveToElement:
                 e1, e2 = self.elementAt(i+1), self.elementAt(i+2)
-                path.cubicTo(QtCore.QPointF(e.x, e.y),
-                             QtCore.QPointF(e1.x, e1.y),
-                             QtCore.QPointF(e2.x, e2.y))
+                path.cubicTo(QPointF(e.x, e.y),
+                             QPointF(e1.x, e1.y),
+                             QPointF(e2.x, e2.y))
                 i += 2
             else:
                 raise ValueError("Invalid element type %s" % (e.type,))
@@ -110,10 +111,10 @@ class QtSvgItem(QtGui.QPainterPath):
         if not path.isEmpty():
             paths.append(path)
         return paths
-    
+
     @staticmethod
     def parseUnit(value):
-        """ Returns userunits given a string representation of units 
+        """ Returns userunits given a string representation of units
         in another system
         """
 
@@ -126,7 +127,7 @@ class QtSvgItem(QtGui.QPainterPath):
         unit = re.compile('(%s)$' % '|'.join(QtSvgItem._uuconv.keys()))
         param = re.compile(
             r'(([-+]?[0-9]+(\.[0-9]*)?|[-+]?\.[0-9]+)([eE][-+]?[0-9]+)?)')
-    
+
         p = param.match(value)
         u = unit.search(value)
         if p:
@@ -139,75 +140,90 @@ class QtSvgItem(QtGui.QPainterPath):
             except KeyError:
                 pass
         return retval
-    
+
     @staticmethod
     def convertToUnit(val, unit='px'):
         """ Convert from px to given unit """
         return val/QtSvgItem._uuconv[unit]
-    
+
     @staticmethod
     def convertFromUnit(val, unit='px'):
         """ Convert from given unit to px """
         return QtSvgItem._uuconv[unit]*val
-        
+
     def parse(self, e):
         raise NotImplementedError("Parse must be implemented in sublcasses!")
-    
+
     def parseTransform(self, e):
-        """ Based on simpletrasnform.py by from 
+        """ Based on simpletrasnform.py by from
         Jean-Francois Barraud, barraud@math.univ-lille1.fr
 
         """
-        t = QtGui.QTransform()
-        
+        t = QTransform()
+
         if isinstance(e, EtreeElement):
             trans = e.attrib.get('transform', '').strip()
         else:
             trans = e # e is a string of the previous transform
-        
+
         if not trans:
             return t
-        
+
         m = re.match(
             "(translate|scale|rotate|skewX|skewY|matrix)\s*\(([^)]*)\)\s*,?",
             trans)
         if m is None:
             return t
-        
+
         name, args = m.group(1), m.group(2).replace(',', ' ').split()
-        
+
         if name == "translate":
+            # The translate(<x> [<y>]) transform function moves the object
+            # by x and y. If y is not provided, it is assumed to be 0.
             dx = float(args[0])
-            dy = len(args) == 2 and float(args[1]) or dx
+            dy = float(args[1]) if len(args) == 2 else 0
             t.translate(dx, dy)
-            
+
         elif name == "scale":
+            # The scale(<x> [<y>]) transform function specifies a scale
+            # operation by x and y. If y is not provided, it is assumed to
+            # be equal to x.
             sx = float(args[0])
-            sy = len(args) == 2 and float(args[1]) or sx
+            sy = float(args[1]) if len(args) == 2 else sx
             t.scale(sx, sy)
-             
+
         elif name == "rotate":
+            # The rotate(<a> [<x> <y>]) transform function specifies a
+            # rotation by a degrees about a given point. If optional
+            # parameters x and y are not supplied, the rotation is about the
+            # origin of the current user coordinate system. If optional
+            # parameters x and y are supplied, the rotation is about the
+            # point (x, y).
             if len(args) == 1:
                 cx, cy = (0, 0)
             else:
                 cx, cy = map(float, args[1:])
-            
+
             t.translate(cx, cy)
             t.rotate(float(args[0]))
             t.translate(-cx, -cy)
-            
+
         elif name == "skewX":
+            # The skewX(<a>) transform function specifies a skew transformation
+            # along the x axis by a degrees.
             t.shear(math.tan(float(args[0])*math.pi/180.0), 0)
 
         elif name == "skewY":
+            # The skewY(<a>) transform function specifies a skew transformation
+            # along the y axis by a degrees.
             t.shear(0, math.tan(float(args[0])*math.pi/180.0))
-            
+
         elif name == "matrix":
-            t = t*QtGui.QTransform(*map(float, args))
-        
+            t = t*QTransform(*map(float, args))
+
         if m.end() < len(trans):
             t = self.parseTransform(trans[m.end():])*t
-            
+
         return t
 
     def __str__(self):
@@ -216,10 +232,10 @@ class QtSvgItem(QtGui.QPainterPath):
 
 class QtSvgEllipse(QtSvgItem):
     tag = "{http://www.w3.org/2000/svg}ellipse"
-    
+
     def parse(self, e):
-        c = QtCore.QPointF(*map(self.parseUnit, (e.attrib.get('cx', 0),
-                                                 e.attrib.get('cy', 0))))
+        c = QPointF(*map(self.parseUnit, (e.attrib.get('cx', 0),
+                                          e.attrib.get('cy', 0))))
         rx, ry = map(self.parseUnit, (e.attrib.get('rx', 0),
                                       e.attrib.get('ry', 0)))
         self.addEllipse(c, rx, ry)
@@ -227,17 +243,17 @@ class QtSvgEllipse(QtSvgItem):
 
 class QtSvgCircle(QtSvgItem):
     tag = "{http://www.w3.org/2000/svg}circle"
-    
+
     def parse(self, e):
-        c = QtCore.QPointF(*map(self.parseUnit, (e.attrib.get('cx', 0),
-                                                 e.attrib.get('cy', 0))))
+        c = QPointF(*map(self.parseUnit, (e.attrib.get('cx', 0),
+                                          e.attrib.get('cy', 0))))
         r = self.parseUnit(e.attrib.get('r', 0))
         self.addEllipse(c, r, r)
 
 
 class QtSvgLine(QtSvgItem):
     tag = "{http://www.w3.org/2000/svg}line"
-    
+
     def parse(self, e):
         x1, y1, x2, y2 = map(self.parseUnit, (
                 e.attrib.get('x1', 0), e.attrib.get('y1', 0),
@@ -249,7 +265,7 @@ class QtSvgLine(QtSvgItem):
 
 class QtSvgRect(QtSvgItem):
     tag = "{http://www.w3.org/2000/svg}rect"
-    
+
     def parse(self, e):
         x, y, w, h, rx, ry = map(self.parseUnit, (
                     e.attrib.get('x', 0), e.attrib.get('y', 0),
@@ -257,10 +273,10 @@ class QtSvgRect(QtSvgItem):
                     e.attrib.get('rx', 0), e.attrib.get('ry', 0),
                 )
         )
-        
+
         if rx == 0 and ry == 0:
             self.addRect(x, y, w, h)
-        else: 
+        else:
             if rx == 0:
                 rx = ry
             elif ry == 0:
@@ -270,7 +286,7 @@ class QtSvgRect(QtSvgItem):
 
 class QtSvgPath(QtSvgItem):
     tag = "{http://www.w3.org/2000/svg}path"
-    
+
     # From  simplepath.py's parsePath by Aaron Spike, aaron@ekips.org
     pathdefs = {
         'M': ['L', 2, [float, float], ['x', 'y']],
@@ -330,8 +346,8 @@ class QtSvgPath(QtSvgItem):
 
         start_theta = -atan2((y1 - cy) * rx, (x1 - cx) * ry)
 
-        start_phi = -atan2(y1 - cy, x1 - cx)
-        end_phi = -atan2(y2 - cy, x2 - cx)
+        start_phi = -atan2((y1 - cy) / ry, (x1 - cx) / rx)
+        end_phi = -atan2((y2 - cy) / ry, (x2 - cx) / rx)
 
         sweep_length = end_phi - start_phi
 
@@ -341,12 +357,12 @@ class QtSvgPath(QtSvgItem):
             sweep_length -= 2 * pi
 
         if phi != 0:
-            rotarc = QtGui.QPainterPath()
+            rotarc = QPainterPath()
             rotarc.moveTo(x1, y1)
             rotarc.arcTo(cx - rx, cy - ry, rx * 2, ry * 2,
                 start_theta * 360 / 2 / pi, sweep_length * 360 / 2 / pi)
 
-            t = QtGui.QTransform()
+            t = QTransform()
             t.translate(x1, y1)
             t.rotate(phi)
             t.translate(-x1, -y1)
@@ -388,7 +404,7 @@ class QtSvgPath(QtSvgItem):
         """
         From  simplepath.py's parsePath by Aaron Spike, aaron@ekips.org
 
-        returns and iterator that breaks path data 
+        returns and iterator that breaks path data
         identifies command and parameter tokens
         """
         offset = 0
@@ -414,22 +430,22 @@ class QtSvgPath(QtSvgItem):
                 offset = m.end()
                 continue
             raise ValueError('Invalid path data at %s!' % offset)
-        
+
     def parsePath(self, d):
         """
         From  simplepath.py's parsePath by Aaron Spike, aaron@ekips.org
-        
+
         Parse SVG path and return an array of segments.
         Removes all shorthand notation.
         Converts coordinates to absolute.
         """
         lexer = self.pathLexer(d)
-    
+
         pen = (0.0, 0.0)
         subPathStart = pen
         lastControl = pen
         lastCommand = ''
-        
+
         while True:
             try:
                 token, isCommand = next(lexer)
@@ -441,7 +457,7 @@ class QtSvgPath(QtSvgItem):
                 if not lastCommand and token.upper() != 'M':
                     raise ValueError('Invalid path, must begin with moveto ('
                                      'M or m), given %s.' % lastCommand)
-                else:                
+                else:
                     command = token
             else:
                 # command was omited
@@ -453,11 +469,11 @@ class QtSvgPath(QtSvgItem):
                     else:
                         command = self.pathdefs[lastCommand.upper()][0].lower()
                 else:
-                    raise ValueError('Invalid path, no initial command.')    
+                    raise ValueError('Invalid path, no initial command.')
             numParams = self.pathdefs[command.upper()][1]
             while numParams > 0:
                 if needParam:
-                    try: 
+                    try:
                         token, isCommand = next(lexer)
                         if isCommand:
                             raise ValueError('Invalid number of parameters '
@@ -476,7 +492,7 @@ class QtSvgPath(QtSvgItem):
                 numParams -= 1
             # segment is now absolute so
             outputCommand = command.upper()
-        
+
             # Flesh out shortcut notation
             if outputCommand in ('H', 'V'):
                 if outputCommand == 'H':
@@ -491,7 +507,7 @@ class QtSvgPath(QtSvgItem):
                     outputCommand = 'C'
                 if outputCommand == 'T':
                     outputCommand = 'Q'
-    
+
             # current values become "last" values
             if outputCommand == 'M':
                 subPathStart = tuple(params[0:2])
@@ -500,31 +516,31 @@ class QtSvgPath(QtSvgItem):
                 pen = subPathStart
             else:
                 pen = tuple(params[-2:])
-    
+
             if outputCommand in ('Q', 'C'):
                 lastControl = tuple(params[-4:-2])
             else:
                 lastControl = pen
-            
+
             lastCommand = command
-    
+
             yield [outputCommand, params]
 
 
 class QtSvgPolyline(QtSvgPath):
     tag = "{http://www.w3.org/2000/svg}polyline"
-    
+
     def parsePathData(self, e):
         d = e.attrib.get('points', '')
         if not d:
-            return 
-        
+            return
+
         return 'M '+d
 
 
 class QtSvgPolygon(QtSvgPolyline):
     tag = "{http://www.w3.org/2000/svg}polygon"
-    
+
     def parsePathData(self, e):
         d = super(QtSvgPolygon, self).parsePathData(e)
         if not d:
@@ -535,7 +551,7 @@ class QtSvgPolygon(QtSvgPolyline):
 class QtSvgUse(QtSvgItem):
     tag = "{http://www.w3.org/2000/svg}use"
     xlink = "{http://www.w3.org/1999/xlink}href"
-    
+
     def parseLink(self, e):
         link = e.attrib.get(self.xlink, '').split("#")
         if len(link) != 2:
@@ -543,12 +559,12 @@ class QtSvgUse(QtSvgItem):
                     "Cannot link to documents outside this "
                     "document, given %s!" % ("#".join(link),))
         link, id = link
-        
+
         svg = e.getroottree().getroot()
         ref = svg.xpath('//*[@id="%s"]' % id)
         if len(ref) > 0:
             return ref[0]
-        
+
     def parse(self, e):
         ref = self.parseLink(e)
         if ref is None:
@@ -559,7 +575,7 @@ class QtSvgUse(QtSvgItem):
             g = etree.Element(QtSvgG.tag)
             g.append(deepcopy(ref))
             self.addPath(QtSvgG(g, self._nodes))
-            
+
     def parseTransform(self, e):
         t = super(QtSvgUse, self).parseTransform(e)
         if isinstance(e, EtreeElement):
@@ -571,19 +587,19 @@ class QtSvgUse(QtSvgItem):
 
 class QtSvgText(QtSvgItem):
     tag = "{http://www.w3.org/2000/svg}text"
-    
+
     stylemap = {
-        'normal': QtGui.QFont.StyleNormal,
-        'italic': QtGui.QFont.StyleItalic,
-        'oblique': QtGui.QFont.StyleOblique
+        'normal': QFont.StyleNormal,
+        'italic': QFont.StyleItalic,
+        'oblique': QFont.StyleOblique
     }
-    
+
     def parse(self, e):
         x, y = map(self.parseUnit, (e.attrib.get('x', 0),
                                     e.attrib.get('y', 0)))
         font = self.parseFont(e)
         self.addText(x, y, font, e.text)
-    
+
     def parseFont(self, e):
         """
         font-style:italic;
@@ -606,14 +622,14 @@ class QtSvgText(QtSvgItem):
         stroke-linecap:butt;
         stroke-linejoin:miter;
         stroke-opacity:1
-        
+
         """
-        font = QtGui.QFont()
+        font = QFont()
         styles = {}
         for item in e.attrib.get('style', '').split(";"):
             k, v = item.split(":")
             styles[k.lower()] = v.lower()
-        
+
         if 'font-style' in styles:
             font.setStyle(self.stylemap.get(
                 styles['font-style'].lower(), 'normal'))
@@ -660,7 +676,7 @@ class QtSvgG(QtSvgItem):
                 if node.tag == cls.tag:
                     self.addPath(cls(node, valid_nodes))
                     break
-    
+
 
 class QtSvgSymbol(QtSvgG):
     tag = "{http://www.w3.org/2000/svg}symbol"
@@ -669,12 +685,12 @@ class QtSvgSymbol(QtSvgG):
 class QtSvgDoc(QtSvgG):
     tag = "{http://www.w3.org/2000/svg}svg"
 
-    def __init__(self, e, ids=None):
+    def __init__(self, e, ids=None, parent=False):
         """
-        Creates a QtPainterPath from an SVG document applying all transforms. 
-        
+        Creates a QtPainterPath from an SVG document applying all transforms.
+
         Does NOT include any styling.
-        
+
         Parameters
         ----------
             e: Element or string
@@ -682,10 +698,12 @@ class QtSvgDoc(QtSvgG):
             ids: List
                 List of node ids to include. If not given all will be used.
         """
-        self.isParentSvg = not isinstance(e, EtreeElement)
+        is_etree = isinstance(e, EtreeElement)
+        self.isParentSvg = parent or not is_etree
         if self.isParentSvg:
-            self._doc = etree.parse(e)
-            self._svg = self._doc.getroot()
+            if not is_etree:
+                self._doc = etree.parse(e)
+                e = self._svg = self._doc.getroot()
             if ids:
                 nodes = set()
                 xpath = self._svg.xpath
@@ -702,12 +720,11 @@ class QtSvgDoc(QtSvgG):
                         parent = parent.getparent()
                 self._nodes = valid_nodes
 
-            self.viewBox = QtCore.QRectF(0, 0, -1, -1)
-        
-        super(QtSvgDoc, self).__init__(self._svg, self._nodes)
-    
+            self.viewBox = QRectF(0, 0, -1, -1)
+        super(QtSvgDoc, self).__init__(e, self._nodes)
+
     def parseTransform(self, e):
-        t = QtGui.QTransform()
+        t = QTransform()
         # transforms don't apply to the root svg element, but we do need to
         # take into account the viewBox there
         if self.isParentSvg:
@@ -733,5 +750,5 @@ class QtSvgDoc(QtSvgG):
             x, y = map(self.parseUnit, (e.attrib.get('x', 0),
                                         e.attrib.get('y', 0)))
             t.translate(x, y)
-            
+
         return t

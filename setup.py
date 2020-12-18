@@ -16,10 +16,10 @@ from setuptools import setup, find_packages
 #: Common requirements
 install_requires = [
     'twisted',
-    'enamlx>=0.4.1',
+    'enamlx>=0.4.2',
     'pyqtgraph',
     'qtconsole',  # now optional
-    'pyserial>=3.4',
+    'pyserial>=3.5',
     'jsonpickle',
     'lxml',  # use sudo apt install libxml2-dev libxslt-dev
 

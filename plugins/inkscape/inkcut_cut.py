@@ -23,10 +23,23 @@ Inkcut, Plot HPGL directly from Inkscape.
 """
 import os
 import sys
+import importlib.util
+optparse_spec = importlib.util.find_spec("optparse")
+if optparse_spec:
+    VERSION="1.X"
+else:
+    VERSION= "0.9"
+
 import inkex
-inkex.localize()
+if VERSION == "1.X":
+    inkex.localization.localize()
+    from lxml import etree
+else:
+    inkex.localize()
 import subprocess
-from inkcut import contains_text, convert_objects_to_paths
+from inkcut4inkscape import contains_text, convert_objects_to_paths
+
+
 
 DEBUG = False
 
@@ -41,13 +54,14 @@ class InkscapeInkcutPlugin(inkex.Effect):
         """ Like cut but requires no selection and does no validation for
         text nodes.
         """
-        nodes = self.selected
+
+        nodes = self.svg.selected if (VERSION == "1.X") else self.selected
         if not len(nodes):
             inkex.errormsg("There were no paths were selected.")
             return
 
         document = self.document
-        if contains_text(self.selected.values()):
+        if contains_text(self.svg.selected.values() if VERSION == "1.X" else self.selected.values()):
             document = convert_objects_to_paths(self.args[-1], self.document)
 
         #: If running from source
@@ -65,9 +79,20 @@ class InkscapeInkcutPlugin(inkex.Effect):
                              stdout=DEVNULL,
                              stderr=subprocess.STDOUT,
                              close_fds=sys.platform != "win32")
-        p.stdin.write(inkex.etree.tostring(document))
+        p.stdin.write(etree.tostring(document) if VERSION == "1.X" else inkex.etree.tostring(document))
         p.stdin.close()
+        
+        # Set the returncode to avoid this warning when popen is garbage collected:
+        # "ResourceWarning: subprocess XXX is still running".
+        # See https://bugs.python.org/issue38890 and
+        # https://bugs.python.org/issue26741.
+        p.returncode = 0
 
-# Create effect instance and apply it.
-effect = InkscapeInkcutPlugin()
-effect.affect()
+if VERSION == "1.X":
+    if __name__ == '__main__':
+        InkscapeInkcutPlugin().run()
+else :
+    effect = InkscapeInkcutPlugin()
+    effect.affect()
+
+

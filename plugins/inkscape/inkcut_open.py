@@ -24,10 +24,21 @@ Inkcut, Plot HPGL directly from Inkscape.
 import os
 import sys
 import inkex
-inkex.localize()
+import importlib.util
+optparse_spec = importlib.util.find_spec("optparse")
+if optparse_spec:
+    VERSION="1.X"
+else:
+    VERSION= "0.9"
+
+if VERSION == "1.X":
+    inkex.localization.localize()
+    from lxml import etree
+else:
+    inkex.localize()
 import subprocess
 
-from inkcut import convert_objects_to_paths
+from inkcut4inkscape import convert_objects_to_paths
 
 DEBUG = False
 try:
@@ -50,7 +61,7 @@ class InkscapeInkcutPlugin(inkex.Effect):
         else:
             cmd = ['inkcut']
 
-        document = convert_objects_to_paths(self.args[-1], self.document)
+        document = convert_objects_to_paths(self.options.input_file if VERSION == "1.X" else self.args[-1], self.document)
 
         cmd += ['open', '-']
         p = subprocess.Popen(cmd,
@@ -58,9 +69,17 @@ class InkscapeInkcutPlugin(inkex.Effect):
                              stdout=DEVNULL,
                              stderr=subprocess.STDOUT,
                              close_fds=sys.platform != "win32")
-        p.stdin.write(inkex.etree.tostring(document))
+        p.stdin.write(etree.tostring(document) if VERSION == "1.X" else inkex.etree.tostring(document))
         p.stdin.close()
+        # Set the returncode to avoid this warning when popen is garbage collected:
+        # "ResourceWarning: subprocess XXX is still running".
+        # See https://bugs.python.org/issue38890 and
+        # https://bugs.python.org/issue26741.
+        p.returncode = 0
 
-# Create effect instance and apply it.
-effect = InkscapeInkcutPlugin()
-effect.affect()
+if VERSION == "1.X":
+    if __name__ == '__main__':
+        InkscapeInkcutPlugin().run()
+else :
+    effect = InkscapeInkcutPlugin()
+    effect.affect()

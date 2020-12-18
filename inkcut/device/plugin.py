@@ -13,7 +13,7 @@ Created on Jan 16, 2015
 import enaml
 import traceback
 from atom.api import (
-    Typed, List, Instance, ForwardInstance, ContainerList, Bool, Unicode,
+    Typed, List, Instance, ForwardInstance, ContainerList, Bool, Str,
     Int, Float, Enum, Bytes, observe
 )
 from contextlib import contextmanager
@@ -62,7 +62,7 @@ class DeviceTransport(Model):
         """ Whenever the protocol changes update the transport reference
 
         """
-        if change['type'] == 'update' and change['value']:
+        if change['type'] in ('update', 'create') and change['value']:
             self.protocol.transport = self
 
     def connect(self):
@@ -320,10 +320,10 @@ class DeviceConfig(Model):
     test_mode = Bool().tag(config=True)
 
     #: Init commands
-    commands_before = Unicode().tag(config=True)
-    commands_after = Unicode().tag(config=True)
-    commands_connect = Unicode().tag(config=True)
-    commands_disconnect = Unicode().tag(config=True)
+    commands_before = Str().tag(config=True)
+    commands_after = Str().tag(config=True)
+    commands_connect = Str().tag(config=True)
+    commands_disconnect = Str().tag(config=True)
 
     def _default_step_time(self):
         """ Determine the step time based on the device speed setting
@@ -355,9 +355,14 @@ class Device(Model):
     and protocol respectively.
 
     """
+    #: Display Items
+    name = Str("New device").tag(config=True)
+    manufacturer = Str().tag(config=True)
+    model = Str().tag(config=True)
+    custom = Bool().tag(config=True)
 
     #: Internal model for drawing the preview on screen
-    area = Instance(AreaBase)
+    area = Instance(AreaBase).tag(config=True)
 
     #: The declaration that defined this device
     declaration = Typed(extensions.DeviceDriver).tag(config=True)
@@ -398,7 +403,7 @@ class Device(Model):
     busy = Bool()
 
     #: Status
-    status = Unicode()
+    status = Str()
 
     def _default_connection(self):
         """ If no connection is set when the device is created,
@@ -564,6 +569,10 @@ class Device(Model):
 
         """
         log.debug("device | connect")
+        if self.connection.connected:
+            log.debug("device | already connected")
+            log.debug(traceback.format_stack())
+            return
         yield defer.maybeDeferred(self.connection.connect)
         cmd = self.config.commands_connect
         if cmd:
@@ -1028,6 +1037,7 @@ class DevicePlugin(Plugin):
         with enaml.imports():
             from .transports.raw.manifest import RawFdManifest
             from .transports.serialport.manifest import SerialManifest
+            from .transports.qtserialport.manifest import QtSerialManifest
             from .transports.printer.manifest import PrinterManifest
             from .transports.disk.manifest import FileManifest
             from .transports.parallelport.manifest import ParallelManifest
@@ -1037,6 +1047,7 @@ class DevicePlugin(Plugin):
             from inkcut.device.pi.manifest import PiManifest
             plugins.append(RawFdManifest)
             plugins.append(SerialManifest)
+            plugins.append(QtSerialManifest)
             plugins.append(PrinterManifest)
             plugins.append(FileManifest)
             plugins.append(ParallelManifest)
@@ -1077,7 +1088,8 @@ class DevicePlugin(Plugin):
         if not self.drivers:
             raise RuntimeError("No device drivers were registered. "
                                "This indicates a missing plugin.")
-        return self.get_device_from_driver(self.drivers[0])
+        self.devices = [self.get_device_from_driver(self.drivers[0])]
+        return self.devices[0]
 
     def _observe_device(self, change):
         """ Whenever the device changes, redraw """

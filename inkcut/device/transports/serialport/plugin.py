@@ -13,7 +13,7 @@ Created on Jul 12, 2015
 import serial
 import traceback
 from atom.atom import set_default
-from atom.api import List, Instance, Enum, Bool, Int, Unicode
+from atom.api import List, Instance, Enum, Bool, Int, Str
 from inkcut.core.api import Plugin, Model, log
 from inkcut.device.plugin import DeviceTransport
 from twisted.internet import reactor
@@ -28,33 +28,12 @@ from inkcut.device.transports.raw.plugin import RawFdTransport, RawFdProtocol
 SERIAL_PARITIES = {v: k for k, v in serial.PARITY_NAMES.items()}
 
 
-def patch_pyserial_if_needed():
-    """ A workaround for
-    https://github.com/pyserial/pyserial/issues/286
-    """
-    try:
-        from serial.tools.list_ports_common import ListPortInfo
-    except ImportError:
-        return
-    try:
-        dummy = ListPortInfo()
-        dummy == None
-        log.debug("pyserial patch not needed")
-    except AttributeError:
-        def __eq__(self, other):
-            return isinstance(other, ListPortInfo) \
-                and self.device == other.device
-        ListPortInfo.__eq__ = __eq__
-        log.debug("pyserial patched")
-patch_pyserial_if_needed()
-
-
 class SerialConfig(Model):
     #: Available serial ports
     ports = List()
 
     #: Serial port config
-    port = Unicode().tag(config=True)
+    port = Str().tag(config=True)
     baudrate = Int(9600).tag(config=True)
     bytesize = Enum(serial.EIGHTBITS, serial.SEVENBITS, serial.SIXBITS,
                     serial.FIVEBITS).tag(config=True)
